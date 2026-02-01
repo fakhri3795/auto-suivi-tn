@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import AppNavigator from './src/navigation/AppNavigator';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { configureNotifications } from './src/services/notificationConfig';
+
 
 Notifications.setNotificationHandler({
   handleNotification: async (): Promise<Notifications.NotificationBehavior> => ({
@@ -13,6 +15,10 @@ Notifications.setNotificationHandler({
   }),
 });
 export default function App() {
+  useEffect(() => {
+  configureNotifications();
+}, []);
+
   useEffect(() => {
   async function registerForNotifications() {
     const { status } =

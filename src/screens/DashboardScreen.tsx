@@ -1,166 +1,174 @@
-import React from 'react';
-import { View, Text, FlatList } from 'react-native';
-import StatCard from '../components/StatCard';
-import { getVehicleGlobalStatus } from '../utils/vehicleStatus';
-import { getStatusColor } from '../utils/status';
-import { getNextAction } from '../utils/nextAction';
+import React, { useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { buildDashboard, DashboardCard } from '../utils/dashboardCalculations';
+import { saveVehicles } from '../storage/vehicleStorage';
+import { scheduleNotification } from '../services/notificationService';
 
 export default function DashboardScreen({ route }: any) {
   const { vehicles } = route.params;
-const isSingleVehicle = vehicles.length === 1;
+  const vehicle = vehicles[0]; // V1 = 1 véhicule
 
-  const total = vehicles.length;
+const initialKm =
+  vehicle?.maintenance?.vidange?.currentKm ?? 0;
 
-  const counts = {
-    VALIDE: 0,
-    BIENTOT: 0,
-    EXPIRE: 0,
+const [currentKm, setCurrentKm] = useState(
+  initialKm.toString()
+);
+
+  const [showKmModal, setShowKmModal] = useState(false);
+
+  const cards = buildDashboard(vehicle);
+
+  const urgentCards = cards.filter(
+    (c) => c.status === 'DANGER' || c.status === 'WARNING'
+  );
+
+  const handleUpdateKm = () => {
+    const km = Number(currentKm);
+    if (isNaN(km)) return;
+
+    vehicle.maintenance.vidange.currentKm = km;
+    vehicle.maintenance.vidange.lastUpdateDate =
+      new Date().toISOString().split('T')[0];
+
+    saveVehicles([vehicle]);
+    setShowKmModal(false);
   };
 
-  vehicles.forEach((v: any) => {
-  let status = getVehicleGlobalStatus(v);
-
-  if (status === 'A_RENSEIGNER') {
-    status = 'BIENTOT';
-  }
-
-  counts[status]++;
-});
-
-
-if (isSingleVehicle) {
-  const vehicle = vehicles[0];
-  const status = getVehicleGlobalStatus(vehicle);
-  const nextAction = getNextAction(vehicle);
-
   return (
+    
     <View style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 22, marginBottom: 20 }}>
-        Mon véhicule 🚗
+      <TouchableOpacity
+  onPress={async () => {
+    await scheduleNotification(
+      'Test AutoSuivi',
+      'Si tu vois ça en popup + son, c’est OK ✅',
+      new Date(Date.now() + 3000),
+    );
+  }}
+  style={{
+    backgroundColor: '#111',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 15,
+  }}
+>
+  <Text style={{ color: 'white', fontWeight: 'bold' }}>
+    Tester une notification
+  </Text>
+</TouchableOpacity>
+
+      {/* TITRE */}
+      <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 15 }}>
+        Aujourd’hui 🚗
       </Text>
 
-      {/* Carte véhicule */}
-      <View
-        style={{
-          padding: 25,
-          borderRadius: 10,
-          backgroundColor: '#f9f9f9',
-          borderLeftWidth: 8,
-          borderLeftColor: getStatusColor(status),
-        }}
-      >
-        <Text style={{ fontSize: 18, marginBottom: 5 }}>
-          {vehicle.brand} {vehicle.model}
-        </Text>
-
-        <Text
-          style={{
-            fontSize: 22,
-            fontWeight: 'bold',
-            color: getStatusColor(status),
-          }}
-        >
-          {status.replace('_', ' ')}
-        </Text>
-      </View>
-
-      {/* Action recommandée */}
-      {nextAction && (
-        <View
-          style={{
-            marginTop: 20,
-            padding: 15,
-            borderRadius: 8,
-            backgroundColor: '#f5f5f5',
-            borderLeftWidth: 6,
-            borderLeftColor: nextAction.color,
-          }}
-        >
-          <Text style={{ fontWeight: 'bold', marginBottom: 5 }}>
-            Action recommandée
+      {/* ACTIONS PRIORITAIRES */}
+      {urgentCards.length > 0 && (
+        <>
+          <Text style={{ fontSize: 16, marginBottom: 10 }}>
+            Actions prioritaires
           </Text>
-          <Text style={{ color: nextAction.color }}>
-            {nextAction.label}
-          </Text>
-        </View>
+
+          {urgentCards.map((card: DashboardCard) => (
+
+            <TouchableOpacity
+              key={card.id}
+              onPress={() => {
+                if (card.actionType === 'UPDATE_KM') {
+                  setShowKmModal(true);
+                }
+              }}
+              style={{
+                backgroundColor: card.color,
+                padding: 16,
+                borderRadius: 12,
+                marginBottom: 12,
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                {card.title}
+              </Text>
+              <Text style={{ color: 'white' }}>{card.subtitle}</Text>
+            </TouchableOpacity>
+          ))}
+        </>
       )}
-    </View>
-  );
-}
 
-  return (
-    <View style={{ flex: 1, padding: 20 }}>
-      {/* Titre */}
-      <Text style={{ fontSize: 22, marginBottom: 15 }}>
-        Dashboard 🚗
-      </Text>
-
-      {/* Cartes statistiques */}
-      <View
-        style={{
-          flexDirection: 'row',
-          marginBottom: 20,
-        }}
-      >
-        <StatCard
-          title="Total"
-          value={total}
-          color="#3498db"
-        />
-        <StatCard
-          title="Valides"
-          value={counts.VALIDE}
-          color="#2ecc71"
-        />
-        <StatCard
-          title="Bientôt"
-          value={counts.BIENTOT}
-          color="#f39c12"
-        />
-        <StatCard
-          title="Expirés"
-          value={counts.EXPIRE}
-          color="#e74c3c"
-        />
-      </View>
-
-      {/* Liste des véhicules */}
-      <Text style={{ fontSize: 18, marginBottom: 10 }}>
-        Véhicules
+      {/* SUIVI */}
+      <Text style={{ fontSize: 16, marginVertical: 10 }}>
+        Suivi du véhicule
       </Text>
 
       <FlatList
-        data={vehicles}
+        data={cards}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          const status = getVehicleGlobalStatus(item);
+        renderItem={({ item }) => (
+          <View
+            style={{
+              backgroundColor: '#f5f5f5',
+              padding: 14,
+              borderRadius: 10,
+              marginBottom: 10,
+            }}
+          >
+            <Text style={{ fontWeight: 'bold' }}>{item.title}</Text>
+            <Text>{item.subtitle}</Text>
+          </View>
+        )}
+      />
 
-          return (
-            <View
+      {/* MODAL KM */}
+      <Modal visible={showKmModal} transparent animationType="slide">
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: 'white',
+              padding: 20,
+              borderRadius: 10,
+            }}
+          >
+            <Text style={{ marginBottom: 10 }}>
+              Kilométrage actuel
+            </Text>
+
+            <TextInput
+              value={currentKm}
+              onChangeText={setCurrentKm}
+              keyboardType="numeric"
               style={{
-                padding: 15,
+                borderWidth: 1,
+                borderColor: '#ccc',
+                padding: 10,
                 borderRadius: 6,
-                marginBottom: 10,
-                backgroundColor: '#f9f9f9',
-                borderLeftWidth: 6,
-                borderLeftColor: getStatusColor(status),
+                marginBottom: 15,
+              }}
+            />
+
+            <TouchableOpacity
+              onPress={handleUpdateKm}
+              style={{
+                backgroundColor: '#1e90ff',
+                padding: 12,
+                borderRadius: 6,
+                alignItems: 'center',
               }}
             >
-              <Text style={{ fontSize: 16 }}>
-                {item.brand} {item.model}
+              <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                Valider
               </Text>
-              <Text
-                style={{
-                  color: getStatusColor(status),
-                  fontWeight: 'bold',
-                }}
-              >
-                {status.replace('_', ' ')}
-              </Text>
-            </View>
-          );
-        }}
-      />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
