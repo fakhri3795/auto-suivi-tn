@@ -8,6 +8,7 @@ import { loadVehicles, saveVehicles } from '../storage/vehicleStorage';
 import {
   scheduleInsuranceNotification,
 } from '../notifications/vehicleNotifications';
+import { createEmptyVehicle } from '../utils/createVehicle';
 
 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
   <View style={{ flex: 1, padding: 20 }}>
@@ -53,48 +54,26 @@ const filteredModels = availableModels.filter((m) =>
   m.toLowerCase().includes(model.toLowerCase()),
 );
 
-  const addVehicle = () => {
-  if (!brand || !model || !year) {
-    return;
-  }
 
-  // 🔽 Fermer le clavier
+ const addVehicle = () => {
+  if (!brand || !model || !year) return;
+
   Keyboard.dismiss();
 
-  const newVehicle: Vehicle = {
-    id: Date.now().toString(),
-    brand,
-    model,
-    year,
-    documents: {
-      assurance: { startDate: '', endDate: '' },
-      vignette: { year: '', paid: false },
-      visiteTechnique: { lastDate: '', nextDate: '' },
-    },
-    maintenance: {
-      vidange: { lastKm: 0, intervalKm: 10000 },
-      filtres: {
-        huile: 0,
-        air: 0,
-        gasoil: 0,
-        habitacle: 0,
-      },
-    },
-  };
+  const newVehicle = createEmptyVehicle(brand, model, year);
 
-setVehicles((prev) => {
-  const updated = [...prev, newVehicle];
-  saveVehicles(updated);
-  scheduleInsuranceNotification(newVehicle);
-
-  return updated;
-});
+  setVehicles((prev) => {
+    const updated = [...prev, newVehicle];
+    saveVehicles(updated);
+    return updated;
+  });
 
   // Reset formulaire
   setBrand('');
   setModel('');
   setYear('');
 };
+
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -285,7 +264,16 @@ setVehicles((prev) => {
         renderItem={({ item }) => (
           <TouchableOpacity
             onPress={() =>
-              navigation.navigate('VehicleDetails', { vehicle: item })
+              navigation.navigate('VehicleDetails', { vehicle: item,
+  onSave: (updatedVehicle: Vehicle) => {
+    setVehicles((prev) => {
+      const updated = prev.map((v) =>
+        v.id === updatedVehicle.id ? updatedVehicle : v
+      );
+      saveVehicles(updated);
+      return updated;
+    });
+  }, })
             }
             style={{
               padding: 15,

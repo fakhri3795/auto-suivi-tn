@@ -6,11 +6,12 @@ import { View, Text,TextInput, TouchableOpacity } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getDateStatus, getStatusColor } from '../utils/status';
 import { Platform } from 'react-native';
+import { useEffect } from 'react';
 
 // Écran Détails Véhicule
 
 export default function VehicleDetailsScreen({ route }: any) {
-  const { vehicle } = route.params;
+  const { vehicle, onSave } = route.params;
 
   // Sécurisation des données
   // (anciens véhicules possibles)
@@ -40,10 +41,14 @@ export default function VehicleDetailsScreen({ route }: any) {
       ? new Date(documents.assurance.endDate)
       : null,
   );
+const [insuranceDuration, setInsuranceDuration] = useState<
+  6 | 12 | null
+>(documents.assurance.duration ?? null);
 
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
+  
   // =======================
   // État – Vidange
   // =======================
@@ -64,29 +69,41 @@ export default function VehicleDetailsScreen({ route }: any) {
   // =======================
   // Sauvegarde locale
   // =======================
-  const saveChanges = () => {
-    vehicle.documents = {
+const saveChanges = () => {
+  const updatedVehicle = {
+    ...vehicle,
+    documents: {
       ...documents,
       assurance: {
-        startDate: assuranceStart
-          ? assuranceStart.toISOString().split('T')[0]
-          : '',
-        endDate: assuranceEnd
-          ? assuranceEnd.toISOString().split('T')[0]
-          : '',
-      },
-    };
-
-    vehicle.maintenance = {
+  startDate: assuranceStart
+    ? assuranceStart.toISOString().split('T')[0]
+    : '',
+  endDate: assuranceEnd
+    ? assuranceEnd.toISOString().split('T')[0]
+    : '',
+  duration: insuranceDuration ?? undefined,
+},
+    },
+    maintenance: {
       ...maintenance,
       vidange: {
         ...maintenance.vidange,
         lastKm: Number(lastKm),
       },
-    };
-
-    alert('Modifications enregistrées (localement)');
+    },
   };
+
+  onSave(updatedVehicle);
+  alert('Modifications enregistrées');
+};
+
+useEffect(() => {
+  if (assuranceStart && insuranceDuration) {
+    const end = new Date(assuranceStart);
+    end.setMonth(end.getMonth() + insuranceDuration);
+    setAssuranceEnd(end);
+  }
+}, [assuranceStart, insuranceDuration]);
 
   // =======================
   // Rendu UI
@@ -145,35 +162,105 @@ export default function VehicleDetailsScreen({ route }: any) {
   />
 )}
 
-      {/* Date fin assurance */}
-      <TouchableOpacity
-        onPress={() => setShowEndPicker(true)}
-        style={{
-          borderWidth: 1,
-          borderColor: '#ccc',
-          padding: 12,
-          borderRadius: 6,
-          marginBottom: 20,
-        }}
-      >
-        <Text>
-          {assuranceEnd
-            ? assuranceEnd.toLocaleDateString('fr-FR')
-            : 'Date fin assurance'}
-        </Text>
-      </TouchableOpacity>
+<Text style={{ marginBottom: 6, fontWeight: 'bold' }}>
+  Durée de l’assurance
+</Text>
 
-      {showEndPicker && (
-  <DateTimePicker
-    value={assuranceEnd || new Date()}
-    mode="date"
-    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-    onChange={(_, selectedDate) => {
-      setShowEndPicker(false);
-      if (selectedDate) setAssuranceEnd(selectedDate);
+<View style={{ flexDirection: 'row', marginBottom: 12 }}>
+  {/* 6 mois */}
+  <TouchableOpacity
+    onPress={() => setInsuranceDuration(6)}
+    style={{
+      flex: 1,
+      padding: 12,
+      marginRight: 6,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: insuranceDuration === 6 ? '#1e90ff' : '#ccc',
+      backgroundColor:
+        insuranceDuration === 6 ? '#eaf3ff' : 'white',
+      alignItems: 'center',
     }}
-  />
+  >
+    <Text
+      style={{
+        fontWeight: 'bold',
+        color: insuranceDuration === 6 ? '#1e90ff' : '#333',
+      }}
+    >
+      6 mois
+    </Text>
+  </TouchableOpacity>
+
+  {/* 1 an */}
+  <TouchableOpacity
+    onPress={() => setInsuranceDuration(12)}
+    style={{
+      flex: 1,
+      padding: 12,
+      marginLeft: 6,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: insuranceDuration === 12 ? '#1e90ff' : '#ccc',
+      backgroundColor:
+        insuranceDuration === 12 ? '#eaf3ff' : 'white',
+      alignItems: 'center',
+    }}
+  >
+    <Text
+      style={{
+        fontWeight: 'bold',
+        color: insuranceDuration === 12 ? '#1e90ff' : '#333',
+      }}
+    >
+      1 an
+    </Text>
+  </TouchableOpacity>
+</View>
+
+
+
+      {/* Date fin assurance */}
+      {!insuranceDuration && (
+  <>
+    <TouchableOpacity
+      onPress={() => setShowEndPicker(true)}
+      style={{
+        borderWidth: 1,
+        borderColor: '#ccc',
+        padding: 12,
+        borderRadius: 6,
+        marginBottom: 20,
+      }}
+    >
+      <Text>
+        {assuranceEnd
+          ? assuranceEnd.toLocaleDateString('fr-FR')
+          : 'Date fin assurance'}
+      </Text>
+    </TouchableOpacity>
+
+    {showEndPicker && (
+      <DateTimePicker
+        value={assuranceEnd || new Date()}
+        mode="date"
+        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+        onChange={(_, selectedDate) => {
+          setShowEndPicker(false);
+          if (selectedDate) setAssuranceEnd(selectedDate);
+        }}
+      />
+    )}
+  </>
 )}
+
+<Text style={{ marginTop: 10, fontWeight: 'bold' }}>
+  Notifications assurance
+</Text>
+
+<Text style={{ color: '#555' }}>
+  Rappels : 30 jours et 14 jours avant expiration
+</Text>
 
 
       {/* =======================
